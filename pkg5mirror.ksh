@@ -19,7 +19,7 @@ log_msg() {
     my_tstamp=$(date "+%b %e %H:%M:%S")
     my_logfile=/var/log/pkg5mirror.log
 
-    printf "%s %s %s: %s\n" "${my_tstamp}" "$(uname -n)" "${my_level}" "${my_msg}" >>"${my_logfile}"
+    printf "%s %s pkg5mirror[%s] %s: %s\n" "${my_tstamp}" "$(uname -n)" $$ "${my_level}" "${my_msg}" >>"${my_logfile}"
 }
 
 usage() {
@@ -79,7 +79,7 @@ repofs=$(/usr/sbin/svccfg -s ${smfid} listprop pkg/inst_root | nawk '{print $3}'
 repods=$(df -k ${repofs} | nawk '$0~/\//  { print $1 }')
 snaptag=@pkg5mirror-$(date +"%Y-%m-%d_%H-%M-%S")
 
-pkgrecvout=/tmp/pkgrecv.out
+pkgrecvout=/tmp/pkgrecv-$$.out
 counter=0
 
 log_msg INFO "starting pkg5mirror for ${publisher}"
