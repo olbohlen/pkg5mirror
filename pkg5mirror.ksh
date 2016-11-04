@@ -22,24 +22,51 @@ log_msg() {
     printf "%s %s %s: %s\n" "${my_tstamp}" "$(uname -n)" "${my_level}" "${my_msg}" >>"${my_logfile}"
 }
 
+usage() {
+    cat <<EOF
+Usage: 
+       $0 -r repoid -o origin [ -p proxy ] [ -k /path/to/key ] [ -c /path/to/cert ]
 
-http_proxy=http://btchttp.btc-ag.com:8080
-https_proxy=http://btchttp.btc-ag.com:8080
-export http_proxy https_proxy
+Example: 
+       $0 -r hipster -o https://pkg.openindiana.org/hipster/ -p http://btchttp.btc-ag.com:8080/
+       $0 -r solaris -o https://pkg.oracle.com/solaris/support/ -p http://btchttp.btc-ag.com:8080/ -k /var/pkg/client.key -c /var/pkt/client.crt
+EOF
+    exit 1
+}
 
 ## main ##
 typeset repofs
 typeset publisher
+typeset pubprefix
 typeset smfid
 typeset snaptag
 typeset cmd_out
 typeset pkgrecvout
 typeset pkgorigin
 typeset counter
+typeset certargs
+typeset keyargs
 
-publisher=$1
+while getopts hr:o:c:k:p: argv; do
+    case ${argv} in
+	h)            usage;;
+	p)            http_proxy=${OPTARG}
+	              https_proxy=${OPTARG}
+		      export http_proxy https_proxy;;
+	c)            certargs=" --cert ${OPTARG}";;
+	k)            keyargs=" --key ${OPTARG}";;
+	r)            publisher=${OPTARG};;
+	o)            pkgorigin=${OPTARG};;
+	*)            usage;;
+    esac
+done
+shift $(( ${OPTIND} - 1 ))
 
-pkgorigin=$2
+# test if mandatory arguments are provided
+if [ x${publisher} == x -o "x${pkgorigin}" == x ]; then
+    log_msg ERROR "stop: -r and/or -o not supplied"
+    exit 1
+fi
 
 smfid=svc:/application/pkg/server:${publisher}
 svcs -- ${smfid} >/dev/null 2>&1
@@ -82,11 +109,14 @@ if [ $? -gt 0 ]; then
     exit 1
 fi
 
+# get the default publisher name from repository
+pubprefix=$( pkgrepo -s file://${repofs}-clone get -H publisher/prefix | nawk '{ print $3 }' )
+
 # at this point we will receive updates to the repository
-log_msg INFO "now starting pkgrecv --clone for ${publisher}"
-pkgrecv -p ${publisher} -s ${pkgorigin} -d file://${repofs}-clone --clone >${pkgrecvout} 2>&1 
+log_msg INFO "now starting pkgrecv --clone for ${pubprefix}"
+pkgrecv -p ${pubprefix} -s ${pkgorigin} -d file://${repofs}-clone --clone >${pkgrecvout} 2>&1 
 if [ $? -gt 0 ]; then
-    log_msg ERROR "pkgrecv -p ${publisher} -s ${pkgorigin} -d file://${repofs}-clone --clone returned an error"
+    log_msg ERROR "pkgrecv -p ${pubprefix} -s ${pkgorigin} -d file://${repofs}-clone --clone returned an error"
     exit 1
 fi
 
