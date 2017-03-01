@@ -25,11 +25,13 @@ log_msg() {
 usage() {
     cat <<EOF
 Usage: 
-       $0 -r repoid -o origin [ -p proxy ] [ -k /path/to/key ] [ -c /path/to/cert ]
+       $0 -r repoid -o origin [ -n ] [ -p proxy ] [ -k /path/to/key ] [ -c /path/to/cert ]
+
+          -n    don't use --clone for pkgrecv to avoid a bug in Hipsters pkgrecv
 
 Example: 
        $0 -r hipster -o https://pkg.openindiana.org/hipster/ -p http://btchttp.btc-ag.com:8080/
-       $0 -r solaris -o https://pkg.oracle.com/solaris/support/ -p http://btchttp.btc-ag.com:8080/ -k /var/pkg/client.key -c /var/pkt/client.crt
+       $0 -r solaris -o https://pkg.oracle.com/solaris/support/ -n -p http://btchttp.btc-ag.com:8080/ -k /var/pkg/client.key -c /var/pkt/client.crt
 EOF
     exit 1
 }
@@ -46,8 +48,9 @@ typeset pkgorigin
 typeset counter
 typeset certargs
 typeset keyargs
+typeset noclone
 
-while getopts hr:o:c:k:p: argv; do
+while getopts hr:o:c:k:p:n argv; do
     case ${argv} in
 	h)            usage;;
 	p)            http_proxy=${OPTARG}
@@ -57,6 +60,7 @@ while getopts hr:o:c:k:p: argv; do
 	k)            keyargs=" --key ${OPTARG}";;
 	r)            publisher=${OPTARG};;
 	o)            pkgorigin=${OPTARG};;
+	n)            noclone=TRUE;;
 	*)            usage;;
     esac
 done
@@ -112,12 +116,23 @@ fi
 # get the default publisher name from repository
 pubprefix=$( pkgrepo -s file://${repofs}-clone get -H publisher/prefix | nawk '{ print $3 }' )
 
-# at this point we will receive updates to the repository
-log_msg INFO "now starting pkgrecv --clone for ${pubprefix}"
-pkgrecv -p ${pubprefix} -s ${pkgorigin} -d file://${repofs}-clone --clone >${pkgrecvout} 2>&1 
-if [ $? -gt 0 ]; then
-    log_msg ERROR "pkgrecv -p ${pubprefix} -s ${pkgorigin} -d file://${repofs}-clone --clone returned an error"
-    exit 1
+if [ x${noclone} == xTRUE ]; then
+    # don't use --clone as Hipsters pkgrecv cannot verify pkg signatures from oracle then
+    # at this point we will receive updates to the repository
+    log_msg INFO "now starting pkgrecv for ${pubprefix}"
+    pkgrecv -s ${pkgorigin} -d file://${repofs}-clone ${certargs} ${keyargs} '*' >${pkgrecvout} 2>&1 
+    if [ $? -gt 0 ]; then
+	log_msg ERROR "pkgrecv -s ${pkgorigin} -d file://${repofs}-clone ${certargs} ${keyargs} '*' returned an error"
+	exit 1
+    fi
+else
+    # at this point we will receive updates to the repository
+    log_msg INFO "now starting pkgrecv --clone for ${pubprefix}"
+    pkgrecv -p ${pubprefix} -s ${pkgorigin} -d file://${repofs}-clone --clone >${pkgrecvout} 2>&1 
+    if [ $? -gt 0 ]; then
+	log_msg ERROR "pkgrecv -p ${pubprefix} -s ${pkgorigin} -d file://${repofs}-clone --clone returned an error"
+	exit 1
+    fi
 fi
 
 # now refresh the cloned and updated repo
