@@ -30,8 +30,8 @@ Usage:
           -n    don't use --clone for pkgrecv to avoid a bug in Hipsters pkgrecv
 
 Example: 
-       $0 -r hipster -o https://pkg.openindiana.org/hipster/ -p http://btchttp.btc-ag.com:8080/
-       $0 -r solaris -o https://pkg.oracle.com/solaris/support/ -n -p http://btchttp.btc-ag.com:8080/ -k /var/pkg/client.key -c /var/pkt/client.crt
+       $0 -r hipster -o https://pkg.openindiana.org/hipster/ -p http://webproxy.corp.com:8080/
+       $0 -r solaris -o https://pkg.oracle.com/solaris/support/ -n -p http://webproxy.corp.com:8080/ -k /var/pkg/client.key -c /var/pkt/client.crt
 EOF
     exit 1
 }
